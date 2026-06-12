@@ -1,0 +1,25 @@
+gothic-romance:
+  title: Gothic Romance
+  description: Dark mansions, secrets, forbidden attraction.
+  setting: Victorian England
+  tone:
+    - dark
+    - mysterious
+    - sensual
+
+paranormal-romance:
+  title: Paranormal Romance
+  description: Supernatural creatures and forbidden love.
+  setting: Modern day
+  tone:
+    - suspenseful
+    - romantic
+    - dangerous
+
+pirate-romance:
+  title: Pirate Romance
+  description: Adventure, treasure, and passion on the high seas.
+  setting: Caribbean
+  tone:
+    - adventurous
+    - seductive

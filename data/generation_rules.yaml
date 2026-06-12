@@ -1,0 +1,16 @@
+story_length:
+  min_words: 3000
+  max_words: 5000
+
+required_sections:
+  - summary
+  - story
+
+required_metadata:
+  - title
+  - genre
+  - tropes
+  - series
+  - source_story
+
+max_tropes_per_story: 4
