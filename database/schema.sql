@@ -1,35 +1,28 @@
-CREATE TABLE source_stories (
+-- database/schema.sql
+
+CREATE TABLE IF NOT EXISTS source_stories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    gutenberg_id INTEGER,
-    source_title TEXT NOT NULL,
-    source_author TEXT,
-    source_url TEXT NOT NULL,
-
-    language TEXT,
-    word_count INTEGER,
-
-    status TEXT DEFAULT 'available',
-
-    imported_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    title TEXT NOT NULL,
+    author TEXT,
+    content TEXT NOT NULL,
+    used INTEGER DEFAULT 0 CHECK (used IN (0, 1)),
+    imported_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 
-CREATE TABLE generated_stories (
+CREATE TABLE IF NOT EXISTS generated_stories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    source_story_id INTEGER,
-
-    generated_title TEXT NOT NULL,
-    slug TEXT UNIQUE,
-
-    genre TEXT,
-    series TEXT,
-
-    summary TEXT,
-
-    markdown_path TEXT,
-
-    published BOOLEAN DEFAULT FALSE,
-
-    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    source_story_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    summary TEXT NOT NULL,
+    genre TEXT NOT NULL,
+    series TEXT DEFAULT '',
+    tropes TEXT NOT NULL, -- JSON array of strings
+    characters TEXT NOT NULL, -- JSON array of objects
+    story_text TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (source_story_id) REFERENCES source_stories(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_source_stories_used ON source_stories(used);
+CREATE INDEX IF NOT EXISTS idx_generated_stories_slug ON generated_stories(slug);

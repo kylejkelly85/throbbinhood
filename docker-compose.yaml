@@ -1,0 +1,19 @@
+services:
+  throbbinhood:
+    container_name: throbbinhood
+    network_mode: "host"
+
+    build: .
+
+    restart: unless-stopped
+
+    volumes:
+      - .:/app
+
+    working_dir: /app
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    stdin_open: true
+    tty: true
