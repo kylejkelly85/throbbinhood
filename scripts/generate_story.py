@@ -26,8 +26,8 @@ class PlatformConfig:
     temperature: float = 0.7
     top_p: float = 0.9
     repeat_penalty: float = 1.1
-    genres: List[str] = field(default_factory=list)
-    tropes: List[str] = field(default_factory=list)
+    genres: Dict[str, Any] = field(default_factory=dict)
+    tropes: Dict[str, Any] = field(default_factory=dict)
     rules: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -37,16 +37,14 @@ def get_ollama_client() -> ollama.Client:
 
 
 def load_configuration() -> PlatformConfig:
-    """Loads and caches runtime parameters from local platform environment files."""
-    logger.info("Loading generation platform configurations.")
+    """Loads and caches runtime parameters from local dictionary-structured YAML configuration files."""
+    logger.info("Loading mapping-based configuration files from data/ directory.")
     try:
         with open("data/genres.yaml", "r", encoding="utf-8") as f:
-            genres_data = yaml.safe_load(f)
-            genres = genres_data.get("genres", []) if genres_data else []
+            genres = yaml.safe_load(f) or {}
 
         with open("data/tropes.yaml", "r", encoding="utf-8") as f:
-            tropes_data = yaml.safe_load(f)
-            tropes = tropes_data.get("tropes", []) if tropes_data else []
+            tropes = yaml.safe_load(f) or {}
 
         with open("data/generation_rules.yaml", "r", encoding="utf-8") as f:
             rules = yaml.safe_load(f) or {}
@@ -78,16 +76,33 @@ def resolve_unique_slug(content_dir: Path, base_title: str) -> str:
     return candidate_slug
 
 
-def construct_prompt(source_story: Dict[str, Any], genre: str, selected_tropes: List[str]) -> str:
-    """Assembles structural baseline guidelines restricting prompt responses strictly to target criteria."""
-    tropes_string = ", ".join(selected_tropes)
+def construct_prompt(
+    source_story: Dict[str, Any], 
+    genre_meta: Dict[str, Any], 
+    selected_tropes_meta: List[Dict[str, Any]], 
+    rules: Dict[str, Any]
+) -> str:
+    """Assembles deep thematic instructions using precise key-mapped metadata and length boundaries."""
+    genre_title = genre_meta.get("title", "Unknown Genre")
+    genre_desc = genre_meta.get("description", "")
+    genre_setting = genre_meta.get("setting", "Unspecified Setting")
+    genre_tones = ", ".join(genre_meta.get("tone", []))
     
+    trope_instructions = []
+    for t in selected_tropes_meta:
+        trope_instructions.append(f"- {t.get('title')}: {t.get('description')}")
+    tropes_string = "\n".join(trope_instructions)
+
+    length_rule = rules.get("story_length", {"min_words": 3000, "max_words": 5000})
+    min_words = length_rule.get("min_words", 3000)
+    max_words = length_rule.get("max_words", 5000)
+
     schema_example = {
         "title": "Generated story title",
-        "summary": "2-3 sentence synopsis",
-        "genre": "Single genre string matching the selected genre",
-        "series": "Empty string unless the source material is explicitly part of a named series",
-        "tropes": ["trope1", "trope2"],
+        "summary": "2-3 sentence synopsis matching required_sections rule",
+        "genre": genre_title,
+        "series": "Empty string unless explicitly part of a named series",
+        "tropes": [t.get("title") for t in selected_tropes_meta],
         "characters": [
             {
                 "name": "Character Name",
@@ -95,27 +110,35 @@ def construct_prompt(source_story: Dict[str, Any], genre: str, selected_tropes: 
                 "description": "Brief description"
             }
         ],
-        "story": "The complete generated story text"
+        "story": "Paragraph 1: The introduction of the dark mansion...\\n\\nParagraph 2: The escalating tension and forbidden attraction...\\n\\nParagraph 3: The climax and resolution of the secrets..."
     }
 
     prompt = f"""
-You are a creative writing AI. Rewrite the following source material into a completely new story.
-Source Title: {source_story['title']}
-Source Author: {source_story['author']}
+You are an expert creative software writer specializing in long-form literary generation. 
+Your objective is to adapt, evolve, and expand the provided source material text into a new story.
 
-Target Genre: {genre}
-Required Tropes: {tropes_string}
+Target Genre Profile:
+- Genre: {genre_title}
+- Motif: {genre_desc}
+- Required Contextual Setting: {genre_setting}
+- Mandatory Tonal Elements: {genre_tones}
+
+Required Narrative Tropes to Integrate:
+{tropes_string}
+
+Structural Constraints:
+- Length Constraint: The generated "story" string text value MUST fall between {min_words} and {max_words} words. 
+- Character Pool Constraint: Document between 2 and 8 primary characters. Prioritize Protagonist, Love Interest, and Antagonist roles. Do not include negligible background personas.
 
 Execution Instructions:
-1. Synthesize a brand new narrative loosely inspired by the structure, premise, or themes of the source text.
-2. The story must match the requested Target Genre and naturally integrate ALL requested Required Tropes.
-3. Identify and construct between 2 and 8 distinct characters. Prioritize the protagonist, love interest, and primary antagonist, then fill remaining slots by narrative importance. Exclude minor one-scene characters.
-4. Output must be a SINGLE valid JSON object matching the exact schema schema listed below. Do not wrap the JSON object inside markdown formatting, do not include triple backticks, and do not provide any preceding or concluding explanations.
+- Output your entire tracking response inside a SINGLE, valid JSON object matching the schema below.
+- Do not add pre-prose summary warnings, post-prose summaries, markdown layout blocks, or triple backtick fences (```json). Output pure parseable JSON text only.
+- The "story" field must be a fully fleshed-out, multi-paragraph narrative using double newlines (\\n\\n) for paragraph breaks. Do not summarize or truncate.
 
-JSON Schema Output Specification:
+JSON Structural Blueprint Schema:
 {json.dumps(schema_example, indent=2)}
 
-Source Material Content:
+Source Text Baseline Blueprint Material:
 {source_story['content']}
 """
     return prompt.strip()
@@ -125,7 +148,7 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
     """Handles structured communication operations targeting Ollama container ports directly."""
     current_prompt = prompt
     for attempt in range(1, retries + 1):
-        logger.info(f"Ollama generation dispatch attempt {attempt}/{retries}")
+        logger.info(f"Ollama structured interface compilation attempt {attempt}/{retries}")
         try:
             response = client.chat(
                 model=config.model_name,
@@ -141,18 +164,21 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
             response_content = response["message"]["content"].strip()
             parsed_json = json.loads(response_content)
             
-            required_keys = ["title", "summary", "genre", "series", "tropes", "characters", "story"]
-            if all(key in parsed_json for key in required_keys):
+            required_keys = config.rules.get("required_metadata", ["title", "genre", "tropes", "series", "source_story"])
+            required_sections = config.rules.get("required_sections", ["summary", "story"])
+            all_validation_keys = set(required_keys + required_sections + ["characters"])
+            
+            if all(k in parsed_json for k in all_validation_keys if k != "source_story"):
                 return parsed_json
                 
-            logger.warning("Ollama response missing structural schema nodes. Initiating loop retry correction parameters.")
-            current_prompt = f"{prompt}\n\nCRITICAL ERROR: Your previous response did not fulfill the structural JSON validation schema constraints. Try again and verify all fields are present."
+            logger.warning("Ollama response missing mandatory schema elements. Re-attempting query modification layout.")
+            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: Your previous JSON object failed structural policy verification requirements. Ensure all requested object fields are populated."
             
         except (json.JSONDecodeError, KeyError) as err:
-            logger.warning(f"Ollama structured interface compilation serialization rejection on attempt {attempt}: {err}")
-            current_prompt = f"{prompt}\n\nCRITICAL ERROR: Your previous response was not parseable as valid JSON. Ensure absolute conformity to format guidelines without escaping errors."
+            logger.warning(f"Ollama compilation schema execution failure on attempt {attempt}: {err}")
+            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: The output string sent could not be deserialized by json.loads(). Output naked, unencapsulated clean valid JSON strings."
             
-    raise RuntimeError("Ollama text parsing operations failed consistently across processing allocation thresholds.")
+    raise RuntimeError("Ollama system resource context loops crashed across extreme attempt limits.")
 
 
 def render_hugo_markdown(story_metadata: Dict[str, Any], source_title: str) -> str:
@@ -193,27 +219,34 @@ def main() -> None:
     
     source_story = db.get_unused_source_story(config.db_path)
     if not source_story:
-        logger.error("Execution terminated: No valid processing candidates within data source parameters.")
+        logger.error("Execution terminated: No unused target story sources present inside storage paths.")
         return
 
     if not config.genres or not config.tropes:
-        logger.error("Execution terminated: Required structural definition variables (genres/tropes) missing content.")
+        logger.error("Execution terminated: Metadata source parameter files contain missing or zero entries.")
         return
 
-    selected_genre = random.choice(config.genres)
-    num_tropes = random.randint(2, min(4, len(config.tropes)))
-    selected_tropes = random.sample(config.tropes, num_tropes)
+    genre_key = random.choice(list(config.genres.keys()))
+    genre_metadata = config.genres[genre_key]
     
-    logger.info(f"Target profile chosen: Genre='{selected_genre}', Tropes={selected_tropes}")
+    max_tropes_allowed = config.rules.get("max_tropes_per_story", 4)
+    all_trope_keys = list(config.tropes.keys())
+    num_tropes_to_pick = random.randint(2, min(max_tropes_allowed, len(all_trope_keys)))
+    selected_trope_keys = random.sample(all_trope_keys, num_tropes_to_pick)
     
-    prompt = construct_prompt(source_story, selected_genre, selected_tropes)
+    selected_tropes_metadata = [config.tropes[tk] for tk in selected_trope_keys]
+    trope_titles_list = [tm.get("title") for tm in selected_tropes_metadata]
+    
+    logger.info(f"Target profile chosen: Genre='{genre_metadata.get('title')}', Tropes={trope_titles_list}")
+    
+    prompt = construct_prompt(source_story, genre_metadata, selected_tropes_metadata, config.rules)
     client = get_ollama_client()
     
     try:
         story_metadata = query_llm_with_retry(client, config, prompt)
         
-        story_metadata["genre"] = selected_genre
-        story_metadata["tropes"] = selected_tropes
+        story_metadata["genre"] = genre_metadata.get("title")
+        story_metadata["tropes"] = trope_titles_list
         
         unique_slug = resolve_unique_slug(content_path, story_metadata["title"])
         story_metadata["slug"] = unique_slug
@@ -234,7 +267,7 @@ def main() -> None:
             raise
             
         db.mark_source_story_used(config.db_path, source_story["id"])
-        logger.info("ThrobbinHood core transformation workflow iteration finished successfully.")
+        logger.info("ThrobbinHood mapping-based text transformation workflow processing routine completed successfully.")
         
     except Exception as run_err:
         logger.error(f"Execution engine failure running story mutation pipeline: {run_err}", exc_info=True)

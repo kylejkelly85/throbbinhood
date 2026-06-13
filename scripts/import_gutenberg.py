@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def clean_gutenberg_text(text: str) -> str:
-    """Removes standard Project Gutenberg headers, footers, and boilerplate legal blocks."""
+    """Removes standard Project Gutenberg headers, footers, and boilerplate legal blocks safely handles short files."""
     start_markers = [
         r"\*\*\* START OF THIS PROJECT GUTENBERG EBOOK",
         r"\*\*\* START OF THE PROJECT GUTENBERG EBOOK",
@@ -32,10 +32,10 @@ def clean_gutenberg_text(text: str) -> str:
             start_idx = i + 1
             break
             
-    for i, line in enumerate(lines[-1000:]):
-        real_idx = len(lines) - 1000 + i
+    scan_offset = max(0, len(lines) - 1000)
+    for i, line in enumerate(lines[scan_offset:]):
         if any(re.search(marker, line, re.IGNORECASE) for marker in end_markers):
-            end_idx = real_idx
+            end_idx = scan_offset + i
             break
             
     cleaned_lines = lines[start_idx:end_idx]
