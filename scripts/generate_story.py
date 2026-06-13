@@ -1,6 +1,3 @@
-# scripts/generate_story.py
-
-import json
 import logging
 import random
 from dataclasses import dataclass, field
@@ -157,7 +154,7 @@ Source Text Baseline Blueprint Material:
 
 
 def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: str, retries: int = 3) -> Dict[str, Any]:
-    """Handles structured communication operations, scaling the model's context window via num_ctx."""
+    """Handles structured communication operations, keeping num_ctx safe for 8GB hardware limits."""
     current_prompt = prompt
     for attempt in range(1, retries + 1):
         logger.info(f"Ollama structured interface compilation attempt {attempt}/{retries}")
@@ -170,7 +167,7 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
                     "temperature": config.temperature,
                     "top_p": config.top_p,
                     "repeat_penalty": config.repeat_penalty,
-                    "num_ctx": 16384  # Expanded context allocation to process large book entries safely
+                    "num_ctx": 4096  # Adjusted window to prevent VRAM buffer allocation crashes
                 }
             )
             
@@ -181,7 +178,6 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
             required_sections = config.rules.get("required_sections", ["summary", "story"])
             all_validation_keys = set(required_keys + required_sections + ["characters"])
             
-            # Filter out source_story as it is injected outside processing logic loops
             missing_keys = [k for k in all_validation_keys if k != "source_story" and k not in parsed_json]
             
             if not missing_keys:
