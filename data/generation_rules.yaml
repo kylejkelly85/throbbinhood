@@ -1,4 +1,4 @@
-model: "phi3:mini"
+model: "sam860/dolphin3-qwen2.5:1.5b"
 temperature: 0.8  # Slight bump for more descriptive flow
 top_p: 0.9
 repeat_penalty: 1.02  # Dropped significantly
@@ -18,4 +18,4 @@ required_metadata:
   - series
   - source_story
 
-max_tropes_per_story: 4
+max_tropes_per_story: 2

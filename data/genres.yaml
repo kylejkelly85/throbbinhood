@@ -23,3 +23,273 @@ pirate-romance:
   tone:
     - adventurous
     - seductive
+
+contemporary-romance:
+  title: Contemporary Romance
+  description: Modern relationships, personal growth, and emotional connection.
+  setting: Present day
+  tone:
+    - realistic
+    - romantic
+    - heartfelt
+
+historical-romance:
+  title: Historical Romance
+  description: Love stories shaped by the customs of the past.
+  setting: Historical era
+  tone:
+    - elegant
+    - emotional
+    - immersive
+
+regency-romance:
+  title: Regency Romance
+  description: Courtship, society scandals, and refined passion.
+  setting: Regency England
+  tone:
+    - witty
+    - charming
+    - romantic
+
+western-romance:
+  title: Western Romance
+  description: Love and survival on the untamed frontier.
+  setting: American West
+  tone:
+    - rugged
+    - adventurous
+    - heartfelt
+
+small-town-romance:
+  title: Small Town Romance
+  description: Community ties, familiar faces, and unexpected love.
+  setting: Small town
+  tone:
+    - cozy
+    - warm
+    - uplifting
+
+sports-romance:
+  title: Sports Romance
+  description: Competitive ambition collides with matters of the heart.
+  setting: Athletic world
+  tone:
+    - energetic
+    - passionate
+    - emotional
+
+college-romance:
+  title: College Romance
+  description: Young love, self-discovery, and life-changing choices.
+  setting: University campus
+  tone:
+    - youthful
+    - dramatic
+    - romantic
+
+military-romance:
+  title: Military Romance
+  description: Duty, sacrifice, and love under pressure.
+  setting: Military life
+  tone:
+    - intense
+    - emotional
+    - inspiring
+
+medical-romance:
+  title: Medical Romance
+  description: Relationships blossom amid high-stakes healthcare work.
+  setting: Hospital or clinic
+  tone:
+    - dramatic
+    - compassionate
+    - hopeful
+
+mafia-romance:
+  title: Mafia Romance
+  description: Dangerous power, loyalty, and forbidden desire.
+  setting: Criminal underworld
+  tone:
+    - dark
+    - intense
+    - seductive
+
+billionaire-romance:
+  title: Billionaire Romance
+  description: Wealth, influence, and unlikely attraction.
+  setting: Luxury lifestyle
+  tone:
+    - glamorous
+    - emotional
+    - escapist
+
+royal-romance:
+  title: Royal Romance
+  description: Duty and love clash within noble circles.
+  setting: Kingdom or monarchy
+  tone:
+    - elegant
+    - dramatic
+    - romantic
+
+romantic-suspense:
+  title: Romantic Suspense
+  description: Danger and mystery intertwine with romance.
+  setting: Modern world
+  tone:
+    - suspenseful
+    - thrilling
+    - passionate
+
+romantic-comedy:
+  title: Romantic Comedy
+  description: Humor, misunderstandings, and charming relationships.
+  setting: Contemporary
+  tone:
+    - lighthearted
+    - funny
+    - romantic
+
+dark-romance:
+  title: Dark Romance
+  description: Obsession, power struggles, and morally gray love.
+  setting: Contemporary or gothic
+  tone:
+    - dark
+    - intense
+    - provocative
+
+fantasy-romance:
+  title: Fantasy Romance
+  description: Magic, kingdoms, and epic love stories.
+  setting: Fantasy world
+  tone:
+    - enchanting
+    - adventurous
+    - emotional
+
+epic-fantasy-romance:
+  title: Epic Fantasy Romance
+  description: Romance unfolds amid wars, prophecies, and kingdoms.
+  setting: Vast fantasy realm
+  tone:
+    - grand
+    - dramatic
+    - heroic
+
+urban-fantasy-romance:
+  title: Urban Fantasy Romance
+  description: Hidden magic and romance in modern cities.
+  setting: Modern metropolis
+  tone:
+    - mysterious
+    - exciting
+    - romantic
+
+science-fiction-romance:
+  title: Science Fiction Romance
+  description: Love survives among advanced technology and distant worlds.
+  setting: Future society
+  tone:
+    - imaginative
+    - adventurous
+    - emotional
+
+alien-romance:
+  title: Alien Romance
+  description: Cross-species attraction bridges different worlds.
+  setting: Space or alien planet
+  tone:
+    - adventurous
+    - passionate
+    - exotic
+
+time-travel-romance:
+  title: Time Travel Romance
+  description: Lovers separated by centuries find a way together.
+  setting: Multiple eras
+  tone:
+    - emotional
+    - adventurous
+    - bittersweet
+
+post-apocalyptic-romance:
+  title: Post-Apocalyptic Romance
+  description: Love persists after civilization collapses.
+  setting: Ruined world
+  tone:
+    - gritty
+    - hopeful
+    - intense
+
+vampire-romance:
+  title: Vampire Romance
+  description: Eternal desire and supernatural temptation.
+  setting: Modern or gothic
+  tone:
+    - dark
+    - seductive
+    - mysterious
+
+werewolf-romance:
+  title: Werewolf Romance
+  description: Instinct, pack loyalty, and powerful attraction.
+  setting: Modern supernatural world
+  tone:
+    - primal
+    - passionate
+    - dangerous
+
+fairy-romance:
+  title: Fairy Romance
+  description: Enchanted courts and magical relationships.
+  setting: Fae realm
+  tone:
+    - whimsical
+    - enchanting
+    - romantic
+
+steampunk-romance:
+  title: Steampunk Romance
+  description: Inventors, airships, and Victorian adventure.
+  setting: Alternate industrial age
+  tone:
+    - adventurous
+    - stylish
+    - imaginative
+
+cozy-romance:
+  title: Cozy Romance
+  description: Gentle relationships with low-stakes conflicts.
+  setting: Quaint community
+  tone:
+    - comforting
+    - wholesome
+    - warm
+
+holiday-romance:
+  title: Holiday Romance
+  description: Love blossoms during festive celebrations.
+  setting: Seasonal destination
+  tone:
+    - cheerful
+    - cozy
+    - uplifting
+
+survival-romance:
+  title: Survival Romance
+  description: Romance develops while overcoming extreme challenges.
+  setting: Wilderness or disaster zone
+  tone:
+    - tense
+    - adventurous
+    - emotional
+
+space-opera-romance:
+  title: Space Opera Romance
+  description: Galactic conflict and sweeping love stories.
+  setting: Interstellar civilization
+  tone:
+    - epic
+    - adventurous
+    - dramatic

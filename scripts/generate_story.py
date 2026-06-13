@@ -1,3 +1,6 @@
+# scripts/generate_story.py
+
+import json
 import logging
 import random
 from dataclasses import dataclass, field
@@ -23,14 +26,14 @@ class PlatformConfig:
     temperature: float = 0.7
     top_p: float = 0.9
     repeat_penalty: float = 1.1
-    genres: Dict[str, Any] = field(default_factory=dict)
-    tropes: Dict[str, Any] = field(default_factory=dict)
+    genres: Dict[str, Any] = field(default_factory=list)
+    tropes: Dict[str, Any] = field(default_factory=list)
     rules: Dict[str, Any] = field(default_factory=dict)
 
 
 def get_ollama_client() -> ollama.Client:
     """Factory function initializing the strict Ollama network client assignment."""
-    return ollama.Client(host="http://192.168.1.252:11434", timeout=120)
+    return ollama.Client(host="http://192.168.1.252:11434", timeout=300)
 
 
 def load_configuration() -> PlatformConfig:
@@ -73,124 +76,156 @@ def resolve_unique_slug(content_dir: Path, base_title: str) -> str:
     return candidate_slug
 
 
-def construct_prompt(
+def generate_metadata_layer(
+    client: ollama.Client, 
+    config: PlatformConfig, 
     source_story: Dict[str, Any], 
-    genre_meta: Dict[str, Any], 
-    selected_tropes_meta: List[Dict[str, Any]], 
-    rules: Dict[str, Any]
-) -> str:
-    """Assembles deep thematic instructions using precise key-mapped metadata, forcing unlabeled prose paragraphs."""
-    genre_title = genre_meta.get("title", "Unknown Genre")
-    genre_desc = genre_meta.get("description", "")
-    genre_setting = genre_meta.get("setting", "Unspecified Setting")
-    genre_tones = ", ".join(genre_meta.get("tone", []))
+    genre_title: str, 
+    tropes_string: str
+) -> Dict[str, Any]:
+    """Executes a decoupled, highly tracking-stable JSON schema constraint pass for foundational metadata keys."""
+    logger.info("Dispatching Step 1: Structural metadata schema generation loop.")
     
-    trope_instructions = []
-    for t in selected_tropes_meta:
-        trope_instructions.append(f"- {t.get('title')}: {t.get('description')}")
-    tropes_string = "\n".join(trope_instructions)
-
-    length_rule = rules.get("story_length", {"min_words": 1500, "max_words": 3000})
-    min_words = length_rule.get("min_words", 1500)
-    max_words = length_rule.get("max_words", 3000)
-
-    example_prose = (
-        "The brooding silhouette of the ancient estate loomed against the storm-swept sky, "
-        "its stone walls harboring decades of secrets. She stepped across the threshold, her heart "
-        "hammering as the heavy oak door clicked shut behind her.\\n\\n"
-        "In the shadows of the grand parlor stood a mysterious figure, whose cold gaze offered no warmth "
-        "to the unexpected visitor. Yet, as their eyes locked, an undeniable tension crackled through "
-        "the room—a dangerous attraction that defied all warnings.\\n\\n"
-        "By midnight, the long-buried mysteries of the manor could no longer be contained. Hand in hand, "
-        "they confronted the hidden truth, shattering the curse that bound them and securing a future "
-        "born from the ashes of their past."
-    )
-
-    schema_example = {
-        "title": "Generated story title",
-        "summary": "2-3 sentence synopsis matching required_sections rule",
-        "genre": genre_title,
-        "series": "Empty string unless explicitly part of a named series",
-        "tropes": [t.get("title") for t in selected_tropes_meta],
+    meta_schema = {
+        "title": "Generated novel variation title",
+        "summary": "Overall 3-act narrative blueprint master synopsis",
+        "series": "Named collection identifier string or an empty string",
         "characters": [
             {
                 "name": "Character Name",
-                "role": "Protagonist/Love Interest/Primary Antagonist/Supporting",
-                "description": "Brief description"
+                "role": "Protagonist / Love Interest / Primary Antagonist / Supporting",
+                "description": "Thematic personality outline trait overview"
             }
-        ],
-        "story": example_prose
+        ]
     }
 
     prompt = f"""
-You are an expert creative software writer specializing in long-form literary generation. 
-Your objective is to adapt, evolve, and expand the provided source material text into a new story.
+You are a structural software parser configuration tool. Review this text outline and build architectural metadata for a new novel adaptation.
+Source Premise: {source_story['title']}
+Target Structural Genre: {genre_title}
+Target Narrative Elements: {tropes_string}
 
-Target Genre Profile:
-- Genre: {genre_title}
-- Motif: {genre_desc}
-- Required Contextual Setting: {genre_setting}
-- Mandatory Tonal Elements: {genre_tones}
+Instructions:
+- Construct structural elements targeting a title, overall summary blueprint, and character registry mapping context.
+- Keep the character pool count restricted between 2 and 8 entries. Prioritize protagonist, love interest, and primary antagonist dynamics.
+- Output your response strictly inside a SINGLE, valid JSON object matching the design template pattern below. Do not wrap code blocks in backticks or Markdown.
 
-Required Narrative Tropes to Integrate:
-{tropes_string}
+Target Pattern:
+{json.dumps(meta_schema, indent=2)}
 
-Structural Constraints:
-- Length Constraint: The generated "story" string text value MUST fall between {min_words} and {max_words} words. 
-- Character Pool Constraint: Document between 2 and 8 primary characters. Prioritize Protagonist, Love Interest, and Antagonist roles. Do not include negligible background personas.
-
-Execution Instructions:
-- Write the story using natural prose paragraphs. Separate every paragraph with exactly two newline characters (\\n\\n). 
-- Do NOT include text headers, labels, or prefixes like "Paragraph 1:", "Introduction:", or chapter titles inside the story content. Write only the raw story text.
-- Output your entire tracking response inside a SINGLE, valid JSON object matching the schema below. Do not wrap the output in markdown formatting or triple backtick blocks (```json).
-
-JSON Structural Blueprint Schema:
-{json.dumps(schema_example, indent=2)}
-
-Source Text Baseline Blueprint Material:
+Source Text Reference Data Fragment:
 {source_story['content']}
 """
-    return prompt.strip()
+    
+    response = client.chat(
+        model=config.model_name,
+        messages=[{"role": "user", "content": prompt.strip()}],
+        format="json",
+        options={
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "repeat_penalty": config.repeat_penalty
+        }
+    )
+    return json.loads(response["message"]["content"].strip())
 
 
-def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: str, retries: int = 3) -> Dict[str, Any]:
-    """Handles structured communication operations, keeping num_ctx safe for 8GB hardware limits."""
-    current_prompt = prompt
-    for attempt in range(1, retries + 1):
-        logger.info(f"Ollama structured interface compilation attempt {attempt}/{retries}")
-        try:
-            response = client.chat(
+def generate_act_layer(
+    client: ollama.Client,
+    config: PlatformConfig,
+    act_name: str,
+    act_instructions: str,
+    meta_layer: Dict[str, Any],
+    genre_meta: Dict[str, Any],
+    tropes_string: str,
+    prior_act_content: Optional[str] = None,
+    max_continuations: int = 3
+) -> str:
+    """Generates a prose segment, recursively auto-continuing execution if the model gets cut off mid-sentence."""
+    logger.info(f"Generating prose segment chunk: {act_name}")
+    
+    genre_title = genre_meta.get("title", "Unknown Genre")
+    genre_setting = genre_meta.get("setting", "Unspecified Setting")
+    genre_tones = ", ".join(genre_meta.get("tone", []))
+    char_string = "\n".join([f"- {c.get('name')} ({c.get('role')}): {c.get('description')}" for c in meta_layer.get("characters", [])])
+
+    history_context = ""
+    if prior_act_content:
+        history_context = f"\nPreviously in the story, the following events occurred:\n[[[ PRIOR NARRATIVE HISTORY ]]]\n{prior_act_content}\n[[[ END OF HISTORY ]]]\n"
+
+    base_prompt = f"""
+You are a long-form creative writer. Write a fluid chronological segment of an immersive novel titled '{meta_layer['title']}'.
+
+Current Processing Segment: {act_name}
+Segment Objective: {act_instructions}
+
+World Configuration Parameters:
+- Genre: {genre_title}
+- Setting Context: {genre_setting}
+- Tonal Atmosphere: {genre_tones}
+- Mandatory Integrated Themes: {tropes_string}
+- Active Character Cast: 
+{char_string}
+{history_context}
+Writing Instructions:
+- Continue the sequence using fluid, natural prose paragraphs separated by a double line break (\\n\\n).
+- Do not provide notes, matches, introduction labels, or markdown containers. Start writing the story text for this segment immediately.
+"""
+    
+    # First generation pass
+    response = client.chat(
+        model=config.model_name,
+        messages=[{"role": "user", "content": base_prompt.strip()}],
+        options={
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "repeat_penalty": 1.02,
+            "num_ctx": 4096,
+            "num_predict": 800  # Sets a clean runway boundary limit per turn
+        }
+    )
+    
+    accumulated_prose = response["message"]["content"].strip()
+    
+    # Continuation evaluation loop
+    for loop_idx in range(max_continuations):
+        # Check if the text fails to close elegantly on standard terminal punctuation
+        if accumulated_prose and accumulated_prose[-1] not in [".", "!", "?", '"', '»']:
+            logger.warning(f"Detected narrative truncation line clip inside {act_name}. Dispatching extension loop turn {loop_idx + 1}.")
+            
+            continuation_prompt = f"""
+You are continuing the transcription of your previous story block which was cut off mid-sentence. 
+Review the existing fragment and continue writing seamlessly from the exact last word. Do not repeat anything.
+
+Existing Truncated Prose:
+... {accumulated_prose[-400:]}
+
+Instructions:
+- Pick up right where that text broke off and complete the sentence naturally.
+- Keep writing to advance and fulfill the segment objective: {act_instructions}
+- Start outputting raw continuation prose text instantly without headers or meta notes.
+"""
+            extension_res = client.chat(
                 model=config.model_name,
-                messages=[{"role": "user", "content": current_prompt}],
-                format="json",
+                messages=[{"role": "user", "content": continuation_prompt.strip()}],
                 options={
                     "temperature": config.temperature,
                     "top_p": config.top_p,
-                    "repeat_penalty": config.repeat_penalty,
-                    "num_ctx": 4096  # Adjusted window to prevent VRAM buffer allocation crashes
+                    "repeat_penalty": 1.02,
+                    "num_ctx": 4096
                 }
             )
             
-            response_content = response["message"]["content"].strip()
-            parsed_json = json.loads(response_content)
-            
-            required_keys = config.rules.get("required_metadata", ["title", "genre", "tropes", "series", "source_story"])
-            required_sections = config.rules.get("required_sections", ["summary", "story"])
-            all_validation_keys = set(required_keys + required_sections + ["characters"])
-            
-            missing_keys = [k for k in all_validation_keys if k != "source_story" and k not in parsed_json]
-            
-            if not missing_keys:
-                return parsed_json
+            append_text = extension_res["message"]["content"].strip()
+            # Clean up potential model overlap text artifacts smoothly
+            if append_text.startswith("..."):
+                append_text = append_text[3:].strip()
                 
-            logger.warning(f"Ollama response missing schema elements: {missing_keys}. Current keys found: {list(parsed_json.keys())}")
-            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: Your previous JSON object failed structural policy verification requirements. Missing keys: {missing_keys}. Ensure all requested object fields are populated."
+            accumulated_prose = f"{accumulated_prose} {append_text}"
+        else:
+            break
             
-        except (json.JSONDecodeError, KeyError) as err:
-            logger.warning(f"Ollama compilation schema execution failure on attempt {attempt}: {err}")
-            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: The output string sent could not be deserialized by json.loads(). Output naked, unencapsulated clean valid JSON strings."
-            
-    raise RuntimeError("Ollama system resource context loops crashed across extreme attempt limits.")
+    return accumulated_prose
 
 
 def render_hugo_markdown(story_metadata: Dict[str, Any], source_title: str) -> str:
@@ -234,10 +269,6 @@ def main() -> None:
         logger.error("Execution terminated: No unused target story sources present inside storage paths.")
         return
 
-    if not config.genres or not config.tropes:
-        logger.error("Execution terminated: Metadata source parameter files contain missing or zero entries.")
-        return
-
     genre_key = random.choice(list(config.genres.keys()))
     genre_metadata = config.genres[genre_key]
     
@@ -248,17 +279,45 @@ def main() -> None:
     
     selected_tropes_metadata = [config.tropes[tk] for tk in selected_trope_keys]
     trope_titles_list = [tm.get("title") for tm in selected_tropes_metadata]
+    tropes_formatted_string = "\n".join([f"- {t.get('title')}: {t.get('description')}" for t in selected_tropes_metadata])
     
     logger.info(f"Target profile chosen: Genre='{genre_metadata.get('title')}', Tropes={trope_titles_list}")
-    
-    prompt = construct_prompt(source_story, genre_metadata, selected_tropes_metadata, config.rules)
     client = get_ollama_client()
     
     try:
-        story_metadata = query_llm_with_retry(client, config, prompt)
+        # Step 1: Capture overall metadata and character profiles
+        meta_layer = generate_metadata_layer(client, config, source_story, genre_metadata.get("title", ""), tropes_formatted_string)
         
-        story_metadata["genre"] = genre_metadata.get("title")
-        story_metadata["tropes"] = trope_titles_list
+        # Step 2: Sequential generation using an auto-healing chained architecture
+        act_i = generate_act_layer(
+            client, config, "Act I: Setup & Inciting Incident", 
+            "Introduce the characters, define the setting, establish the initial friction, and introduce the main thematic conflict.", 
+            meta_layer, genre_metadata, tropes_formatted_string
+        )
+        
+        act_ii = generate_act_layer(
+            client, config, "Act II: Rising Action & Complication", 
+            "Complicate the relationship dynamics. Force the characters to work through their friction together while confronting obstacles or uncovering secrets.", 
+            meta_layer, genre_metadata, tropes_formatted_string, prior_act_content=act_i
+        )
+        
+        act_iii = generate_act_layer(
+            client, config, "Act III: Climax & Absolute Resolution", 
+            "Bring the thematic tension to an explosive peak. Break the core barriers down, settle the conflict permanently, and provide a definitive, highly complete emotional wrap-up ending.", 
+            meta_layer, genre_metadata, tropes_formatted_string, prior_act_content=act_ii
+        )
+        
+        full_story_text = f"{act_i}\n\n{act_ii}\n\n{act_iii}"
+        
+        story_metadata = {
+            "title": meta_layer.get("title", f"Novel Adaptation of {source_story['title']}"),
+            "summary": meta_layer.get("summary", ""),
+            "series": meta_layer.get("series", ""),
+            "characters": meta_layer.get("characters", []),
+            "genre": genre_metadata.get("title"),
+            "tropes": trope_titles_list,
+            "story": full_story_text
+        }
         
         unique_slug = resolve_unique_slug(content_path, story_metadata["title"])
         story_metadata["slug"] = unique_slug
@@ -267,7 +326,6 @@ def main() -> None:
         target_file_path = content_path / markdown_filename
         
         markdown_output = render_hugo_markdown(story_metadata, source_story["title"])
-        
         db.save_generated_story(config.db_path, story_metadata, source_story["id"])
         
         try:
@@ -279,7 +337,7 @@ def main() -> None:
             raise
             
         db.mark_source_story_used(config.db_path, source_story["id"])
-        logger.info("ThrobbinHood mapping-based text transformation workflow processing routine completed successfully.")
+        logger.info("ThrobbinHood multi-act text pipeline iteration completed successfully.")
         
     except Exception as run_err:
         logger.error(f"Execution engine failure running story mutation pipeline: {run_err}", exc_info=True)
