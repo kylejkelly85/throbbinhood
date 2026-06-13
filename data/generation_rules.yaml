@@ -4,8 +4,8 @@ top_p: 0.9
 repeat_penalty: 1.02  # Dropped significantly
 
 story_length:
-  min_words: 1500  # More realistic target for a single-pass 3B JSON property
-  max_words: 3000
+  min_words: 5000  # More realistic target for a single-pass 3B JSON property
+  max_words: 9000
 
 required_sections:
   - summary

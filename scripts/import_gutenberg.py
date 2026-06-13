@@ -10,8 +10,8 @@ logger = logging.getLogger("ThrobbinHood.import_gutenberg")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def clean_gutenberg_text(text: str) -> str:
-    """Removes standard Project Gutenberg headers, footers, and boilerplate legal blocks safely handles short files."""
+def clean_gutenberg_text(text: str, max_characters: int = 25000) -> str:
+    """Removes boilerplate, extracts a clean seed window, and cuts safely at a paragraph break."""
     start_markers = [
         r"\*\*\* START OF THIS PROJECT GUTENBERG EBOOK",
         r"\*\*\* START OF THE PROJECT GUTENBERG EBOOK",
@@ -39,7 +39,23 @@ def clean_gutenberg_text(text: str) -> str:
             break
             
     cleaned_lines = lines[start_idx:end_idx]
-    return "\n".join(cleaned_lines).strip()
+    full_cleaned_text = "\n".join(cleaned_lines).strip()
+    
+    # If the text exceeds our maximum context allocation window, truncate it safely
+    if len(full_cleaned_text) > max_characters:
+        logger.info(f"Text length ({len(full_cleaned_text)}) exceeds max limit ({max_characters}). Executing graceful boundary slicing.")
+        truncated_subset = full_cleaned_text[:max_characters]
+        
+        # Locate the last clean double-newline to avoid clipping a sentence or paragraph mid-thought
+        last_paragraph = truncated_subset.rfind("\n\n")
+        if last_paragraph != -1:
+            full_cleaned_text = truncated_subset[:last_paragraph].strip()
+        else:
+            # Fallback to last space if no paragraph break is found nearby
+            last_space = truncated_subset.rfind(" ")
+            full_cleaned_text = truncated_subset[:last_space].strip() + "..."
+            
+    return full_cleaned_text
 
 
 def parse_gutenberg_metadata(text: str) -> tuple[str, str]:
@@ -58,8 +74,8 @@ def parse_gutenberg_metadata(text: str) -> tuple[str, str]:
     return title, author
 
 
-def import_file(db_path: str, file_path: Path, min_length: int = 5000) -> None:
-    """Normalizes encoding, cleans, parses, and imports a single Gutenberg text file into the DB."""
+def import_file(db_path: str, file_path: Path, min_length: int = 5000, max_length: int = 25000) -> None:
+    """Normalizes encoding, cleans, downsamples, and imports a Gutenberg text file into the DB."""
     logger.info(f"Processing file: {file_path}")
     
     raw_content = ""
@@ -77,7 +93,7 @@ def import_file(db_path: str, file_path: Path, min_length: int = 5000) -> None:
         return
 
     title, author = parse_gutenberg_metadata(raw_content)
-    cleaned_content = clean_gutenberg_text(raw_content)
+    cleaned_content = clean_gutenberg_text(raw_content, max_characters=max_length)
     
     if len(cleaned_content) < min_length:
         logger.warning(f"Skipping {file_path}: cleaned content length ({len(cleaned_content)}) below threshold {min_length}")
@@ -88,25 +104,26 @@ def import_file(db_path: str, file_path: Path, min_length: int = 5000) -> None:
         with sqlite3.connect(db_path) as conn:
             with conn:
                 conn.execute(query, (title, author, cleaned_content))
-        logger.info(f"Successfully imported '{title}' by {author}")
+        logger.info(f"Successfully imported downsampled version of '{title}' by {author} ({len(cleaned_content)} chars)")
     except Exception as e:
         logger.error(f"Failed to insert story into database: {e}", exc_info=True)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import Project Gutenberg texts into ThrobbinHood DB")
+    parser = argparse.ArgumentParser(description="Import Project Gutenberg texts into ThrobbinHood DB with size normalization")
     parser.add_argument("--db", default="database/stories.db", help="Path to SQLite database")
     parser.add_argument("--source", required=True, help="Path to file or directory containing Gutenberg TXT files")
     parser.add_argument("--min-len", type=int, default=5000, help="Minimum text character length threshold")
+    parser.add_argument("--max-len", type=int, default=25000, help="Maximum text character length window limit (~4000 words)")
     
     args = parser.parse_args()
     source_path = Path(args.source)
     
     if source_path.is_file():
-        import_file(args.db, source_path, args.min_len)
+        import_file(args.db, source_path, args.min_len, args.max_len)
     elif source_path.is_dir():
         for txt_file in source_path.glob("**/*.txt"):
-            import_file(args.db, txt_file, args.min_len)
+            import_file(args.db, txt_file, args.min_len, args.max_len)
     else:
         logger.error(f"Provided source path does not exist or is invalid: {source_path}")
 

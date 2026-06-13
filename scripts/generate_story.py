@@ -82,7 +82,7 @@ def construct_prompt(
     selected_tropes_meta: List[Dict[str, Any]], 
     rules: Dict[str, Any]
 ) -> str:
-    """Assembles deep thematic instructions using precise key-mapped metadata and length boundaries."""
+    """Assembles deep thematic instructions using precise key-mapped metadata, forcing unlabeled prose paragraphs."""
     genre_title = genre_meta.get("title", "Unknown Genre")
     genre_desc = genre_meta.get("description", "")
     genre_setting = genre_meta.get("setting", "Unspecified Setting")
@@ -93,9 +93,21 @@ def construct_prompt(
         trope_instructions.append(f"- {t.get('title')}: {t.get('description')}")
     tropes_string = "\n".join(trope_instructions)
 
-    length_rule = rules.get("story_length", {"min_words": 3000, "max_words": 5000})
-    min_words = length_rule.get("min_words", 3000)
-    max_words = length_rule.get("max_words", 5000)
+    length_rule = rules.get("story_length", {"min_words": 1500, "max_words": 3000})
+    min_words = length_rule.get("min_words", 1500)
+    max_words = length_rule.get("max_words", 3000)
+
+    example_prose = (
+        "The brooding silhouette of the ancient estate loomed against the storm-swept sky, "
+        "its stone walls harboring decades of secrets. She stepped across the threshold, her heart "
+        "hammering as the heavy oak door clicked shut behind her.\\n\\n"
+        "In the shadows of the grand parlor stood a mysterious figure, whose cold gaze offered no warmth "
+        "to the unexpected visitor. Yet, as their eyes locked, an undeniable tension crackled through "
+        "the room—a dangerous attraction that defied all warnings.\\n\\n"
+        "By midnight, the long-buried mysteries of the manor could no longer be contained. Hand in hand, "
+        "they confronted the hidden truth, shattering the curse that bound them and securing a future "
+        "born from the ashes of their past."
+    )
 
     schema_example = {
         "title": "Generated story title",
@@ -110,7 +122,7 @@ def construct_prompt(
                 "description": "Brief description"
             }
         ],
-        "story": "Paragraph 1: The introduction of the dark mansion...\\n\\nParagraph 2: The escalating tension and forbidden attraction...\\n\\nParagraph 3: The climax and resolution of the secrets..."
+        "story": example_prose
     }
 
     prompt = f"""
@@ -131,9 +143,9 @@ Structural Constraints:
 - Character Pool Constraint: Document between 2 and 8 primary characters. Prioritize Protagonist, Love Interest, and Antagonist roles. Do not include negligible background personas.
 
 Execution Instructions:
-- Output your entire tracking response inside a SINGLE, valid JSON object matching the schema below.
-- Do not add pre-prose summary warnings, post-prose summaries, markdown layout blocks, or triple backtick fences (```json). Output pure parseable JSON text only.
-- The "story" field must be a fully fleshed-out, multi-paragraph narrative using double newlines (\\n\\n) for paragraph breaks. Do not summarize or truncate.
+- Write the story using natural prose paragraphs. Separate every paragraph with exactly two newline characters (\\n\\n). 
+- Do NOT include text headers, labels, or prefixes like "Paragraph 1:", "Introduction:", or chapter titles inside the story content. Write only the raw story text.
+- Output your entire tracking response inside a SINGLE, valid JSON object matching the schema below. Do not wrap the output in markdown formatting or triple backtick blocks (```json).
 
 JSON Structural Blueprint Schema:
 {json.dumps(schema_example, indent=2)}
@@ -145,7 +157,7 @@ Source Text Baseline Blueprint Material:
 
 
 def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: str, retries: int = 3) -> Dict[str, Any]:
-    """Handles structured communication operations targeting Ollama container ports directly."""
+    """Handles structured communication operations, scaling the model's context window via num_ctx."""
     current_prompt = prompt
     for attempt in range(1, retries + 1):
         logger.info(f"Ollama structured interface compilation attempt {attempt}/{retries}")
@@ -157,7 +169,8 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
                 options={
                     "temperature": config.temperature,
                     "top_p": config.top_p,
-                    "repeat_penalty": config.repeat_penalty
+                    "repeat_penalty": config.repeat_penalty,
+                    "num_ctx": 16384  # Expanded context allocation to process large book entries safely
                 }
             )
             
@@ -168,11 +181,14 @@ def query_llm_with_retry(client: ollama.Client, config: PlatformConfig, prompt: 
             required_sections = config.rules.get("required_sections", ["summary", "story"])
             all_validation_keys = set(required_keys + required_sections + ["characters"])
             
-            if all(k in parsed_json for k in all_validation_keys if k != "source_story"):
+            # Filter out source_story as it is injected outside processing logic loops
+            missing_keys = [k for k in all_validation_keys if k != "source_story" and k not in parsed_json]
+            
+            if not missing_keys:
                 return parsed_json
                 
-            logger.warning("Ollama response missing mandatory schema elements. Re-attempting query modification layout.")
-            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: Your previous JSON object failed structural policy verification requirements. Ensure all requested object fields are populated."
+            logger.warning(f"Ollama response missing schema elements: {missing_keys}. Current keys found: {list(parsed_json.keys())}")
+            current_prompt = f"{prompt}\n\nCRITICAL SYSTEM FAILURE: Your previous JSON object failed structural policy verification requirements. Missing keys: {missing_keys}. Ensure all requested object fields are populated."
             
         except (json.JSONDecodeError, KeyError) as err:
             logger.warning(f"Ollama compilation schema execution failure on attempt {attempt}: {err}")
