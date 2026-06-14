@@ -1,18 +1,16 @@
-FROM python:3.12-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
+# Install the requirement
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy the app script
+COPY app.py .
 
-RUN pip install --no-cache-dir ollama
+# Streamlit network port
+EXPOSE 8501
 
-COPY . .
-
-CMD ["bash"]
-
+# Run the web server
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]

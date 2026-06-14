@@ -3,6 +3,7 @@
 import json
 import logging
 import random
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -26,8 +27,11 @@ class PlatformConfig:
     temperature: float = 0.7
     top_p: float = 0.9
     repeat_penalty: float = 1.1
-    genres: Dict[str, Any] = field(default_factory=list)
-    tropes: Dict[str, Any] = field(default_factory=list)
+    mirostat: int = 0  # 0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0
+    mirostat_tau: float = 5.0  # Target entropy/perplexity (creativity level)
+    mirostat_eta: float = 0.1  # Learning rate adjustments
+    genres: Dict[str, Any] = field(default_factory=dict)
+    tropes: Dict[str, Any] = field(default_factory=dict)
     rules: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -36,9 +40,23 @@ def get_ollama_client() -> ollama.Client:
     return ollama.Client(host="http://192.168.1.252:11434", timeout=300)
 
 
+def clean_json_response(text: str) -> str:
+    """Extracts valid JSON boundaries from model outputs, stripping raw markdown fence wrappers safely."""
+    ticks = "`" * 3
+    text = re.sub(rf'{ticks}(?:json)?\s*', '', text)
+    text = re.sub(rf'{ticks}\s*$', '', text)
+    
+    start_boundary = text.find('{')
+    end_boundary = text.rfind('}')
+    if start_boundary != -1 and end_boundary != -1:
+        text = text[start_boundary:end_boundary + 1]
+        
+    return text.strip()
+
+
 def load_configuration() -> PlatformConfig:
-    """Loads and caches runtime parameters from local dictionary-structured YAML configuration files."""
-    logger.info("Loading mapping-based configuration files from data/ directory.")
+    """Loads and caches configuration parameters, dynamically mapping Mirostat options from execution rules."""
+    logger.info("Loading system orchestration configuration parameters from data/ files.")
     try:
         with open("data/genres.yaml", "r", encoding="utf-8") as f:
             genres = yaml.safe_load(f) or {}
@@ -54,6 +72,9 @@ def load_configuration() -> PlatformConfig:
             temperature=float(rules.get("temperature", 0.7)),
             top_p=float(rules.get("top_p", 0.9)),
             repeat_penalty=float(rules.get("repeat_penalty", 1.1)),
+            mirostat=int(rules.get("mirostat", 0)),
+            mirostat_tau=float(rules.get("mirostat_tau", 5.0)),
+            mirostat_eta=float(rules.get("mirostat_eta", 0.1)),
             genres=genres,
             tropes=tropes,
             rules=rules
@@ -83,7 +104,7 @@ def generate_metadata_layer(
     genre_title: str, 
     tropes_string: str
 ) -> Dict[str, Any]:
-    """Executes a decoupled, highly tracking-stable JSON schema constraint pass for foundational metadata keys."""
+    """Executes a structural metadata schema pass using strict user/system separation and JSON cleaning arrays."""
     logger.info("Dispatching Step 1: Structural metadata schema generation loop.")
     
     meta_schema = {
@@ -100,7 +121,7 @@ def generate_metadata_layer(
     }
 
     prompt = f"""
-You are a structural software parser configuration tool. Review this text outline and build architectural metadata for a new novel adaptation.
+Build architectural metadata for a new novel adaptation based on these target variables:
 Source Premise: {source_story['title']}
 Target Structural Genre: {genre_title}
 Target Narrative Elements: {tropes_string}
@@ -108,26 +129,31 @@ Target Narrative Elements: {tropes_string}
 Instructions:
 - Construct structural elements targeting a title, overall summary blueprint, and character registry mapping context.
 - Keep the character pool count restricted between 2 and 8 entries. Prioritize protagonist, love interest, and primary antagonist dynamics.
-- Output your response strictly inside a SINGLE, valid JSON object matching the design template pattern below. Do not wrap code blocks in backticks or Markdown.
+- Output your response strictly inside a SINGLE, valid JSON object matching the design template pattern below.
 
 Target Pattern:
 {json.dumps(meta_schema, indent=2)}
-
-Source Text Reference Data Fragment:
-{source_story['content']}
 """
+    
+    options_payload = {
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "repeat_penalty": config.repeat_penalty,
+        "num_ctx": 4096
+    }
     
     response = client.chat(
         model=config.model_name,
-        messages=[{"role": "user", "content": prompt.strip()}],
+        messages=[
+            {"role": "system", "content": "You are a JSON tracking asset validation tool. Output valid JSON objects exclusively."},
+            {"role": "user", "content": prompt.strip()}
+        ],
         format="json",
-        options={
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "repeat_penalty": config.repeat_penalty
-        }
+        options=options_payload
     )
-    return json.loads(response["message"]["content"].strip())
+    
+    cleaned_content = clean_json_response(response["message"]["content"])
+    return json.loads(cleaned_content)
 
 
 def generate_act_layer(
@@ -139,9 +165,9 @@ def generate_act_layer(
     genre_meta: Dict[str, Any],
     tropes_string: str,
     prior_act_content: Optional[str] = None,
-    max_continuations: int = 3
+    max_continuations: int = 4
 ) -> str:
-    """Generates a prose segment, recursively auto-continuing execution if the model gets cut off mid-sentence."""
+    """Generates a standalone prose segment chunk, utilizing Mirostat parameters dynamically if enabled in config."""
     logger.info(f"Generating prose segment chunk: {act_name}")
     
     genre_title = genre_meta.get("title", "Unknown Genre")
@@ -151,7 +177,7 @@ def generate_act_layer(
 
     history_context = ""
     if prior_act_content:
-        history_context = f"\nPreviously in the story, the following events occurred:\n[[[ PRIOR NARRATIVE HISTORY ]]]\n{prior_act_content}\n[[[ END OF HISTORY ]]]\n"
+        history_context = f"\nPreviously in the story, the following events occurred:\n[[[ PRIOR NARRATIVE HISTORY ]]]\n{prior_act_content[-2000:]}\n[[[ END OF HISTORY ]]]\n"
 
     base_prompt = f"""
 You are a long-form creative writer. Write a fluid chronological segment of an immersive novel titled '{meta_layer['title']}'.
@@ -169,59 +195,67 @@ World Configuration Parameters:
 {history_context}
 Writing Instructions:
 - Continue the sequence using fluid, natural prose paragraphs separated by a double line break (\\n\\n).
-- Do not provide notes, matches, introduction labels, or markdown containers. Start writing the story text for this segment immediately.
+- Start writing the story text for this segment immediately without narrative preambles or notes.
 """
     
-    # First generation pass
+    options_payload = {
+        "num_ctx": 4096,
+        "num_predict": 512,
+        "repeat_penalty": config.repeat_penalty
+    }
+    
+    if config.mirostat in [1, 2]:
+        options_payload["mirostat"] = config.mirostat
+        options_payload["mirostat_tau"] = config.mirostat_tau
+        options_payload["mirostat_eta"] = config.mirostat_eta
+        options_payload["temperature"] = config.temperature
+    else:
+        options_payload["temperature"] = config.temperature
+        options_payload["top_p"] = config.top_p
+
     response = client.chat(
         model=config.model_name,
-        messages=[{"role": "user", "content": base_prompt.strip()}],
-        options={
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "repeat_penalty": 1.02,
-            "num_ctx": 4096,
-            "num_predict": 800  # Sets a clean runway boundary limit per turn
-        }
+        messages=[
+            {"role": "system", "content": "You are an untamed creative writer. Output direct story prose text without conversational introduction meta notes."},
+            {"role": "user", "content": base_prompt.strip()}
+        ],
+        options=options_payload
     )
     
     accumulated_prose = response["message"]["content"].strip()
     
-    # Continuation evaluation loop
     for loop_idx in range(max_continuations):
-        # Check if the text fails to close elegantly on standard terminal punctuation
         if accumulated_prose and accumulated_prose[-1] not in [".", "!", "?", '"', '»']:
-            logger.warning(f"Detected narrative truncation line clip inside {act_name}. Dispatching extension loop turn {loop_idx + 1}.")
+            logger.warning(f"Detected paragraph truncation split within {act_name}. Dispatching text continuation query turn {loop_idx + 1}.")
             
-            continuation_prompt = f"""
-You are continuing the transcription of your previous story block which was cut off mid-sentence. 
-Review the existing fragment and continue writing seamlessly from the exact last word. Do not repeat anything.
-
-Existing Truncated Prose:
-... {accumulated_prose[-400:]}
-
-Instructions:
-- Pick up right where that text broke off and complete the sentence naturally.
-- Keep writing to advance and fulfill the segment objective: {act_instructions}
-- Start outputting raw continuation prose text instantly without headers or meta notes.
-"""
+            continuation_prompt = f"Continue writing the story seamlessly from this exact point without repeating existing text:\n\n... {accumulated_prose[-400:]}"
+            
             extension_res = client.chat(
                 model=config.model_name,
-                messages=[{"role": "user", "content": continuation_prompt.strip()}],
-                options={
-                    "temperature": config.temperature,
-                    "top_p": config.top_p,
-                    "repeat_penalty": 1.02,
-                    "num_ctx": 4096
-                }
+                messages=[
+                    {"role": "system", "content": "Continue writing raw story text seamlessly. No notes."},
+                    {"role": "user", "content": continuation_prompt}
+                ],
+                options=options_payload
             )
             
-            append_text = extension_res["message"]["content"].strip()
-            # Clean up potential model overlap text artifacts smoothly
-            if append_text.startswith("..."):
-                append_text = append_text[3:].strip()
+            new_chunk = extension_res["message"]["content"].strip()
+            new_chunk = re.sub(r'^(Here is|Continuing|Next paragraph).*?:', '', new_chunk).strip()
+            if new_chunk.startswith("..."):
+                new_chunk = new_chunk[3:].strip()
                 
-            accumulated_prose = f"{accumulated_prose} {append_text}"
+            overlap_len = min(60, len(accumulated_prose), len(new_chunk))
+            overlap_found = False
+            for match_size in range(overlap_len, 4, -1):
+                if accumulated_prose[-match_size:].lower() == new_chunk[:match_size].lower():
+                    new_chunk = new_chunk[match_size:]
+                    overlap_found = True
+                    break
+                    
+            if overlap_found:
+                accumulated_prose = f"{accumulated_prose}{new_chunk}"
+            else:
+                accumulated_prose = f"{accumulated_prose}\n\n{new_chunk}"
         else:
             break
             
@@ -285,10 +319,8 @@ def main() -> None:
     client = get_ollama_client()
     
     try:
-        # Step 1: Capture overall metadata and character profiles
         meta_layer = generate_metadata_layer(client, config, source_story, genre_metadata.get("title", ""), tropes_formatted_string)
         
-        # Step 2: Sequential generation using an auto-healing chained architecture
         act_i = generate_act_layer(
             client, config, "Act I: Setup & Inciting Incident", 
             "Introduce the characters, define the setting, establish the initial friction, and introduce the main thematic conflict.", 
@@ -303,7 +335,7 @@ def main() -> None:
         
         act_iii = generate_act_layer(
             client, config, "Act III: Climax & Absolute Resolution", 
-            "Bring the thematic tension to an explosive peak. Break the core barriers down, settle the conflict permanently, and provide a definitive, highly complete emotional wrap-up ending.", 
+            "Bring the thematic tension to an explosive peak. Break the core barriers down, settle the conflict permanently, and provide a definitive emotional wrap-up ending.", 
             meta_layer, genre_metadata, tropes_formatted_string, prior_act_content=act_ii
         )
         
@@ -337,7 +369,7 @@ def main() -> None:
             raise
             
         db.mark_source_story_used(config.db_path, source_story["id"])
-        logger.info("ThrobbinHood multi-act text pipeline iteration completed successfully.")
+        logger.info("ThrobbinHood multi-act text pipeline iteration completed successfully with Mirostat checks.")
         
     except Exception as run_err:
         logger.error(f"Execution engine failure running story mutation pipeline: {run_err}", exc_info=True)
