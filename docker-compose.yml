@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///data/pipeline.db
+      - LOG_LEVEL=INFO
+      - DOWNLOAD_DIR=downloads/
+      - CONFIDENCE_THRESHOLD=0.7
+    restart: unless-stopped

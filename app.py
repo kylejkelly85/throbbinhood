@@ -1,25 +1,14 @@
-import streamlit as st
-import os
+import uvicorn
+from fasthtml.common import fast_app
+from src.presentation.routes import setup_routes
+from src.infrastructure.database import init_db
 
-st.set_page_config(page_title="Throbbinhood Storage Test", layout="wide")
-st.title("🚀 Throbbinhood Streamlit Dashboard")
+# Initialize FastHTML Starlette Application
+# Lifecycle hook mapped to app startup
+app, rt = fast_app(on_startup=[init_db])
 
-# Create a local folder called 'input' inside your app workspace
-SAVE_DIR = "input"
-os.makedirs(SAVE_DIR, exist_ok=True)
+# Mount routing setup
+setup_routes(app, rt)
 
-uploaded_file = st.file_uploader("Upload a file to test local storage save", type=["pdf", "txt"])
-
-if uploaded_file:
-    # Build the path where it will land
-    file_path = os.path.join(SAVE_DIR, uploaded_file.name)
-    
-    # Corrected method: getbuffer() has no underscore
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-        
-    st.success(f"✅ Saved permanently! File is sitting at: `{file_path}`")
-    
-    # List the directory to visually confirm the file exists on the disk
-    st.write("📁 **Current files in storage directory:**")
-    st.code(os.listdir(SAVE_DIR))
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True, workers=1)
