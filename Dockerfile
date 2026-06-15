@@ -1,42 +1,20 @@
-# Multi-stage production build for ARM64/Jetson
-FROM python:3.12-slim-bookworm as builder
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-RUN pip install --user --no-cache-dir sqlite-utils sqlite-minutils
-
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
+    PYTHONDONTWRITEBYTECODE=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
-# Install Playwright system dependencies (Minimal for chromium)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 \
-    libxss1 \
-    libasound2 \
-    fonts-noto-color-emoji \
-    libdrm2 \
-    libgbm1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libxshmfence1 \
-    libexpat1 \
-    && rm -rf /var/lib/apt/lists/*
+# Install Python dependencies first
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir sqlite_minutils
 
-COPY --from=builder /root/.local /root/.local
+# Let Playwright install ALL needed dependencies
+RUN playwright install --with-deps chromium
+
 COPY . .
-
-# Run playwright install
-RUN playwright install chromium
 
 EXPOSE 8000
 

@@ -3,6 +3,7 @@ from src.application.asset_service import AssetService
 from src.infrastructure.crawlee_engine import CrawleeEngine
 from src.domain.entities import CrawlJob
 from src.domain.value_objects import CrawlStateEnum
+from src.infrastructure.logger import logger
 import uuid
 import asyncio
 from typing import List
@@ -17,9 +18,12 @@ class CrawlManager:
         job_id = str(uuid.uuid4())
         job = CrawlJob(id=job_id, seed_urls=seed_urls, max_requests=max_requests, state=CrawlStateEnum.RUNNING)
         await self.job_repo.save(job)
-        
-        # Dispatch background work via AsyncIO
-        asyncio.create_task(self._run_crawl(job))
+    
+        # Store task reference to prevent garbage collection
+        task = asyncio.create_task(self._run_crawl(job))
+        # Add error callback
+        task.add_done_callback(lambda t: logger.error("crawl_task_failed", exc_info=t.exception()) if t.exception() else None)
+    
         return job_id
         
     async def _run_crawl(self, job: CrawlJob) -> None:
@@ -28,7 +32,8 @@ class CrawlManager:
             job_id_str = str(job.id)
             await self.crawler_engine.run(job_id_str, job.seed_urls, job.max_requests)
             job.state = CrawlStateEnum.COMPLETED
-        except Exception:
+        except Exception as e:
+            logger.error("crawl_failed", job_id=job.id, error=str(e), exc_info=True)
             job.state = CrawlStateEnum.FAILED
         finally:
             await self.job_repo.save(job)
