@@ -1,5 +1,5 @@
-python-fasthtml==0.5.2
-sqlite_minutils>=3.36 
+python-fasthtml>=0.6.0
+sqlite_minutils>=3.36
 crawlee[playwright]>=0.4.2
 sqlalchemy[asyncio]>=2.0.30
 aiosqlite>=0.20.0
