@@ -24,23 +24,33 @@ def Layout(title: str, *content: Any) -> Html:
 def AssetTable(assets: list[Asset], page: int) -> Div:
     rows = []
     for asset in assets:
+        action_td = Td(asset.status, cls="p-2 border")
+        if asset.status == "Pending":
+            action_td = Td(
+                Button("Download", hx_post=f"/download/{asset.id}", hx_target="closest tr", hx_swap="outerHTML", cls="bg-green-500 text-white px-2 py-1 rounded"),
+                cls="p-2 border"
+            )
+        elif asset.status == "Ingested":
+            action_td = Td("Ingested ✓", cls="p-2 border text-green-600 font-bold")
+
         rows.append(Tr(
             Td(asset.title, cls="p-2 border"),
             Td(A(asset.url, href=asset.url, target="_blank", cls="text-blue-500"), cls="p-2 border"),
             Td(f"{asset.confidence_score:.2f}", cls="p-2 border"),
-            Td(Button("Download", cls="bg-green-500 text-white px-2 py-1 rounded"), cls="p-2 border")
+            action_td
         ))
     
     return Div(
         Table(
-            Thead(Tr(Th("Title", cls="p-2 border"), Th("URL", cls="p-2 border"), Th("Score", cls="p-2 border"), Th("Action", cls="p-2 border"))),
+            Thead(Tr(Th("Title", cls="p-2 border"), Th("URL", cls="p-2 border"), Th("Score", cls="p-2 border"), Th("Status/Action", cls="p-2 border"))),
             Tbody(*rows),
-            cls="w-full border-collapse"
+            cls="w-full text-sm text-left rtl:text-right text-gray-500"
         ),
         Div(
             A("Previous", href=f"/?page={page-1}", cls="text-blue-500 mr-4") if page > 1 else "",
             A("Next", href=f"/?page={page+1}", cls="text-blue-500") if len(assets) == 50 else "",
             cls="mt-4"
         ),
-        id="asset-table"
+        id="asset-table",
+        cls="relative overflow-x-auto"
     )

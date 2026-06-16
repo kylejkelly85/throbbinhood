@@ -6,7 +6,18 @@ class DownloadService:
         self.download_manager = download_manager
         self.asset_repo = asset_repo
 
-    async def download_asset(self, asset_id: str, url: str) -> str:
-        filepath = await self.download_manager.stream_download(url, asset_id)
-        # Update asset DB model in production architecture
+    async def execute_download(self, asset_id: str) -> str:
+        asset = await self.asset_repo.get_by_id(asset_id)
+        if not asset:
+            raise ValueError(f"Asset with id {asset_id} not found")
+        
+        # Derive filename from url or id
+        filename = f"{asset.id}.pdf"
+        if asset.url.split("/")[-1]:
+            filename = asset.url.split("/")[-1]
+            
+        filepath = await self.download_manager.stream_download(asset.url, filename)
+        asset.status = "Ingested"
+        asset.local_path = filepath
+        await self.asset_repo.save(asset)
         return filepath

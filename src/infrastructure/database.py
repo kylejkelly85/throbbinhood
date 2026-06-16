@@ -12,6 +12,8 @@ class CrawlJobModel(Base):
     __tablename__ = "crawl_jobs"
     id: Mapped[str] = mapped_column(String, primary_key=True)
     seed_urls: Mapped[str] = mapped_column(String)
+    target_keyword: Mapped[str] = mapped_column(String)
+    file_extension: Mapped[str] = mapped_column(String)
     max_requests: Mapped[int] = mapped_column(Integer)
     state: Mapped[str] = mapped_column(String)
 
@@ -23,7 +25,8 @@ class AssetModel(Base):
     title: Mapped[str] = mapped_column(String)
     content_snippet: Mapped[str] = mapped_column(String)
     confidence_score: Mapped[float] = mapped_column(Float)
-    is_downloaded: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String, default="Pending")
+    local_path: Mapped[str] = mapped_column(String, nullable=True)
 
 async def init_db() -> None:
     async with engine.begin() as conn:

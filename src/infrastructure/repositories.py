@@ -8,6 +8,15 @@ import json
 class AssetRepository:
     async def save(self, asset: Asset) -> None:
         async with async_session_maker() as session:
+            if asset.id:
+                model = await session.get(AssetModel, asset.id)
+                if model:
+                    model.status = asset.status
+                    model.local_path = asset.local_path
+                    model.confidence_score = asset.confidence_score
+                    await session.commit()
+                    return
+            
             model = AssetModel(
                 id=asset.id or str(uuid.uuid4()),
                 job_id=asset.job_id,
@@ -15,10 +24,18 @@ class AssetRepository:
                 title=asset.title,
                 content_snippet=asset.content_snippet,
                 confidence_score=asset.confidence_score,
-                is_downloaded=asset.is_downloaded
+                status=asset.status,
+                local_path=asset.local_path
             )
             session.add(model)
             await session.commit()
+            if not asset.id:
+                asset.id = model.id
+
+    async def get_by_id(self, asset_id: str) -> Asset | None:
+        async with async_session_maker() as session:
+            model = await session.get(AssetModel, asset_id)
+            return Asset.model_validate(model) if model else None
             
     async def get_paginated(self, page: int, limit: int = 50) -> List[Asset]:
         offset = (page - 1) * limit
@@ -44,6 +61,8 @@ class JobRepository:
                 model = CrawlJobModel(
                     id=str(job.id),
                     seed_urls=json.dumps(job.seed_urls),
+                    target_keyword=job.target_keyword,
+                    file_extension=job.file_extension,
                     max_requests=job.max_requests,
                     state=job.state.value
                 )

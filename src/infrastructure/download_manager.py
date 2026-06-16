@@ -9,8 +9,8 @@ class DownloadManager:
         if not os.path.exists(self.download_dir):
             os.makedirs(self.download_dir)
 
-    async def stream_download(self, url: str, asset_id: str) -> str:
-        filepath = os.path.join(self.download_dir, f"{asset_id}.pdf")
+    async def stream_download(self, url: str, filename: str) -> str:
+        filepath = os.path.join(self.download_dir, filename)
         
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
