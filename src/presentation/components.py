@@ -39,9 +39,9 @@ def AssetTable(assets: list[Asset], page: int) -> Div:
             action_td = Td("Ingested ✓", cls="p-2 border text-green-600 font-bold")
 
         rows.append(Tr(
-            Td(asset.title, cls="p-2 border"),
-            Td(A(asset.url, href=asset.url, target="_blank", cls="text-blue-500"), cls="p-2 border"),
-            Td(f"{asset.confidence_score:.2f}", cls="p-2 border"),
+            Td(asset.title or "", cls="p-2 border"),
+            Td(A(asset.url or "", href=asset.url or "#", target="_blank", cls="text-blue-500"), cls="p-2 border"),
+            Td(f"{asset.confidence_score:.2f}" if asset.confidence_score is not None else "0.00", cls="p-2 border"),
             action_td
         ))
 
@@ -50,6 +50,8 @@ def AssetTable(assets: list[Asset], page: int) -> Div:
         pagination.append(A("Previous", href=f"/?page={page-1}", cls="text-blue-500 mr-4"))
     if len(assets) == 50:
         pagination.append(A("Next", href=f"/?page={page+1}", cls="text-blue-500"))
+
+    pagination_div = Div(*pagination, cls="mt-4") if pagination else None
 
     return Div(
         Table(
@@ -62,7 +64,7 @@ def AssetTable(assets: list[Asset], page: int) -> Div:
             Tbody(*rows),
             cls="w-full text-sm text-left rtl:text-right text-gray-500"
         ),
-        Div(*pagination, cls="mt-4") if pagination else "",
+        *([pagination_div] if pagination_div else []),
         id="asset-table",
         cls="relative overflow-x-auto"
     )
