@@ -9,36 +9,10 @@ def setup_routes(app: Any, rt: Any) -> None:
 
     @rt("/")
     async def get(page: int = 1) -> Any:
-        import traceback
-        try:
-            assets = await container.asset_service.get_assets(page)
-            print(f"DEBUG assets: type={type(assets)}, len={len(assets)}")
-            total = await container.asset_service.get_total_count()
-            print(f"DEBUG total: type={type(total)}, value={total!r}")
-        
-            # Build piece by piece to isolate the bool
-            table = AssetTable(assets, page)
-            print(f"DEBUG table built OK: {type(table)}")
-        
-            content = Layout("Targeted Harvester",
-                Div("FORM PLACEHOLDER"),   # strip the form out temporarily
-                Div(id="status"),
-                Div("INFO PLACEHOLDER"),   # strip the info box out temporarily
-                Div(
-                    H2("High Confidence Assets", cls="text-xl font-bold mb-4"),
-                    Div(f"Total passed: {total}", id="total-count", hx_get="/count", hx_trigger="every 5s"),
-                    table,
-                    hx_get=f"/?page={page}", hx_trigger="every 10s", hx_select="#asset-table", hx_swap="outerHTML"
-                )
-            )
-            print("DEBUG content built OK")
-            return content
-        except Exception as e:
-            print(f"DEBUG EXCEPTION: {e}")
-            traceback.print_exc()
-            raise
+        assets = await container.asset_service.get_assets(page)
+        total = await container.asset_service.get_total_count()
 
-        content = Layout("Targeted Harvester",   # <-- Store in variable
+        content = Layout("Targeted Harvester",
             Div(
                 Form(
                     Div(
@@ -86,9 +60,7 @@ def setup_routes(app: Any, rt: Any) -> None:
                 hx_get=f"/?page={page}", hx_trigger="every 10s", hx_select="#asset-table", hx_swap="outerHTML"
             )
         )
-        return HTMLResponse(str(content))  # <-- RETURN THIS INSTEAD
-
-    # ... rest of file stays EXACTLY the same ...
+        return HTMLResponse(str(content))
 
     @rt("/start", methods=["POST"])
     async def post_start(urls: str = "", target_keyword: str = "", file_extension: str = "pdf") -> Any:
@@ -97,7 +69,7 @@ def setup_routes(app: Any, rt: Any) -> None:
         seed_urls = [u.strip() for u in raw_urls if u.strip()]
         
         if not seed_urls:
-            return Div("Please enter at least one URL.", cls="text-red-500 font-medium")
+            return HTMLResponse(str(Div("Please enter at least one URL.", cls="text-red-500 font-medium")))
             
         normalized_urls = []
         for url in seed_urls:
@@ -106,7 +78,7 @@ def setup_routes(app: Any, rt: Any) -> None:
             normalized_urls.append(url)
             
         if not target_keyword.strip():
-            return Div("Target Keyword is completely mandatory.", cls="text-red-500 font-medium")
+            return HTMLResponse(str(Div("Target Keyword is completely mandatory.", cls="text-red-500 font-medium")))
             
         from src.application.download_service import DownloadService # Ensures download binding context
         
@@ -117,7 +89,7 @@ def setup_routes(app: Any, rt: Any) -> None:
             max_requests=10
         )
         logger.info("started_crawl", job_id=job_id)
-        return Div(f"Started targeted harvesting job {job_id}", cls="text-green-600 font-bold")
+        return HTMLResponse(str(Div(f"Started targeted harvesting job {job_id}", cls="text-green-600 font-bold")))
 
     @rt("/count")
     async def get_count() -> Any:
@@ -140,14 +112,15 @@ def setup_routes(app: Any, rt: Any) -> None:
             # Fetch updated asset to render new row
             asset = await container.asset_repo.get_by_id(asset_id)
             if asset:
-                return Tr(
+                return HTMLResponse(str(Tr(
                     Td(asset.title, cls="p-2 border"),
                     Td(A(asset.url, href=asset.url, target="_blank", cls="text-blue-500"), cls="p-2 border"),
                     Td(f"{asset.confidence_score:.2f}", cls="p-2 border"),
                     Td("Ingested ✓", cls="p-2 border text-green-600 font-bold")
-                )
+                )))
         except Exception as e:
             logger.error("asset_download_failed", asset_id=asset_id, error=str(e))
         
-        # Fallback empty string if fails
-        return ""
+        # Fallback empty response if fails
+        return HTMLResponse("")
+
