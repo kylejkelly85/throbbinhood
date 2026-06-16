@@ -9,13 +9,35 @@ def setup_routes(app: Any, rt: Any) -> None:
 
     @rt("/")
     async def get(page: int = 1) -> Any:
-        assets = await container.asset_service.get_assets(page)
-        total = await container.asset_service.get_total_count()
-
-        # DEBUG: check what types are being passed
-        print(f"assets type: {type(assets)}, count: {len(assets)}")
-        print(f"total type: {type(total)}, value: {total}")
+        import traceback
+        try:
+            assets = await container.asset_service.get_assets(page)
+            print(f"DEBUG assets: type={type(assets)}, len={len(assets)}")
+            total = await container.asset_service.get_total_count()
+            print(f"DEBUG total: type={type(total)}, value={total!r}")
         
+            # Build piece by piece to isolate the bool
+            table = AssetTable(assets, page)
+            print(f"DEBUG table built OK: {type(table)}")
+        
+            content = Layout("Targeted Harvester",
+                Div("FORM PLACEHOLDER"),   # strip the form out temporarily
+                Div(id="status"),
+                Div("INFO PLACEHOLDER"),   # strip the info box out temporarily
+                Div(
+                    H2("High Confidence Assets", cls="text-xl font-bold mb-4"),
+                    Div(f"Total passed: {total}", id="total-count", hx_get="/count", hx_trigger="every 5s"),
+                    table,
+                    hx_get=f"/?page={page}", hx_trigger="every 10s", hx_select="#asset-table", hx_swap="outerHTML"
+                )
+            )
+            print("DEBUG content built OK")
+            return content
+        except Exception as e:
+            print(f"DEBUG EXCEPTION: {e}")
+            traceback.print_exc()
+            raise
+
         content = Layout("Targeted Harvester",   # <-- Store in variable
             Div(
                 Form(
