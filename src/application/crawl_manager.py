@@ -6,6 +6,7 @@ from src.domain.value_objects import CrawlStateEnum
 import uuid
 import asyncio
 from typing import List
+from src.infrastructure.logger import logger
 
 class CrawlManager:
     def __init__(self, job_repo: JobRepository, asset_service: AssetService, crawler_engine: CrawleeEngine) -> None:
@@ -35,7 +36,8 @@ class CrawlManager:
             job_id_str = str(job.id)
             await self.crawler_engine.run(job_id_str, job.seed_urls, job.max_requests, job.target_keyword, job.file_extension)
             job.state = CrawlStateEnum.COMPLETED
-        except Exception:
+        except Exception as e:
+            logger.error("crawl_failed", job_id=job.id, error=str(e), exc_info=True)
             job.state = CrawlStateEnum.FAILED
         finally:
             await self.job_repo.save(job)

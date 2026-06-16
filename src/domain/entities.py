@@ -5,6 +5,8 @@ from typing import List, Optional
 class CrawlJob(BaseModel):
     id: Optional[str] = None
     seed_urls: List[str]
+    target_keyword: str
+    file_extension: str
     max_requests: int
     state: CrawlStateEnum = CrawlStateEnum.PENDING
 

@@ -24,13 +24,12 @@ def Layout(title: str, *content: Any) -> Html:
 def AssetTable(assets: list[Asset], page: int) -> Div:
     rows = []
     for asset in assets:
-        action_td = Td(asset.status, cls="p-2 border")
-        if asset.status == "Pending":
+        if not asset.is_downloaded:
             action_td = Td(
                 Button("Download", hx_post=f"/download/{asset.id}", hx_target="closest tr", hx_swap="outerHTML", cls="bg-green-500 text-white px-2 py-1 rounded"),
                 cls="p-2 border"
             )
-        elif asset.status == "Ingested":
+        else:
             action_td = Td("Ingested ✓", cls="p-2 border text-green-600 font-bold")
 
         rows.append(Tr(

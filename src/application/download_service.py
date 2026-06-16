@@ -17,7 +17,6 @@ class DownloadService:
             filename = asset.url.split("/")[-1]
             
         filepath = await self.download_manager.stream_download(asset.url, filename)
-        asset.status = "Ingested"
-        asset.local_path = filepath
+        asset.is_downloaded = True
         await self.asset_repo.save(asset)
         return filepath

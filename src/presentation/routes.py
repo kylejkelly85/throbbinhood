@@ -67,13 +67,20 @@ def setup_routes(app: Any, rt: Any) -> None:
         
         if not seed_urls:
             return Div("Please enter at least one URL.", cls="text-red-500 font-medium")
+            
+        normalized_urls = []
+        for url in seed_urls:
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            normalized_urls.append(url)
+            
         if not target_keyword.strip():
             return Div("Target Keyword is completely mandatory.", cls="text-red-500 font-medium")
             
         from src.application.download_service import DownloadService # Ensures download binding context
         
         job_id = await container.crawl_manager.start_crawl(
-            seed_urls=seed_urls, 
+            seed_urls=normalized_urls, 
             target_keyword=target_keyword.strip(), 
             file_extension=file_extension,
             max_requests=10

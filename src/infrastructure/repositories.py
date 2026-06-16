@@ -11,8 +11,7 @@ class AssetRepository:
             if asset.id:
                 model = await session.get(AssetModel, asset.id)
                 if model:
-                    model.status = asset.status
-                    model.local_path = asset.local_path
+                    model.is_downloaded = asset.is_downloaded
                     model.confidence_score = asset.confidence_score
                     await session.commit()
                     return
@@ -24,8 +23,7 @@ class AssetRepository:
                 title=asset.title,
                 content_snippet=asset.content_snippet,
                 confidence_score=asset.confidence_score,
-                status=asset.status,
-                local_path=asset.local_path
+                is_downloaded=asset.is_downloaded
             )
             session.add(model)
             await session.commit()

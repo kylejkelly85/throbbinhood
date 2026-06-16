@@ -25,8 +25,7 @@ class AssetModel(Base):
     title: Mapped[str] = mapped_column(String)
     content_snippet: Mapped[str] = mapped_column(String)
     confidence_score: Mapped[float] = mapped_column(Float)
-    status: Mapped[str] = mapped_column(String, default="Pending")
-    local_path: Mapped[str] = mapped_column(String, nullable=True)
+    is_downloaded: Mapped[bool] = mapped_column(Boolean, default=False)
 
 async def init_db() -> None:
     from sqlalchemy import text
@@ -34,8 +33,6 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         
         migrations = [
-            "ALTER TABLE assets ADD COLUMN status VARCHAR DEFAULT 'Pending'",
-            "ALTER TABLE assets ADD COLUMN local_path VARCHAR",
             "ALTER TABLE crawl_jobs ADD COLUMN target_keyword VARCHAR DEFAULT ''",
             "ALTER TABLE crawl_jobs ADD COLUMN file_extension VARCHAR"
         ]
