@@ -11,6 +11,11 @@ def setup_routes(app: Any, rt: Any) -> None:
     async def get(page: int = 1) -> Any:
         assets = await container.asset_service.get_assets(page)
         total = await container.asset_service.get_total_count()
+
+        # DEBUG: check what types are being passed
+        print(f"assets type: {type(assets)}, count: {len(assets)}")
+        print(f"total type: {type(total)}, value: {total}")
+        
         content = Layout("Targeted Harvester",   # <-- Store in variable
             Div(
                 Form(
