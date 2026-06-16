@@ -3,6 +3,7 @@ from src.application.scoring_service import ConfidenceScoringService
 from src.infrastructure.logger import logger
 from crawlee.crawlers import PlaywrightCrawlingContext
 from typing import Callable, Awaitable, List
+import os
 
 class CrawleeEngine:
     def __init__(
@@ -12,9 +13,21 @@ class CrawleeEngine:
     ) -> None:
         self.scoring_service = scoring_service
         self.on_asset_created = on_asset_created
+        # Set environment variables for Chromium
+        os.environ['PLAYWRIGHT_CHROMIUM_ARGS'] = '--no-sandbox --disable-setuid-sandbox'
 
     async def run(self, job_id: str, seed_urls: List[str], max_requests: int) -> None:
         crawler = CrawlerFactory.create_playwright_crawler(max_requests)
+        
+        # Override browser pool options to disable sandbox
+        crawler.browser_pool_options = {
+            'browser_type': 'chromium',
+            'headless': True,
+            'launch_options': {
+                'chromium_sandbox': False,
+                'args': ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            }
+        }
 
         @crawler.router.default_handler
         async def request_handler(context: PlaywrightCrawlingContext) -> None:

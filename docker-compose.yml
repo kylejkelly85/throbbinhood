@@ -10,9 +10,13 @@ services:
       - ./downloads:/app/downloads
       - ./logs:/app/logs
     environment:
-      - PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox --disable-setuid-sandbox
-      - DATABASE_URL=sqlite+aiosqlite:///data/pipeline.db
-      - LOG_LEVEL=INFO
-      - DOWNLOAD_DIR=downloads/
-      - CONFIDENCE_THRESHOLD=0.7
+       - DATABASE_URL=sqlite+aiosqlite:///data/pipeline.db
+       - LOG_LEVEL=INFO
+       - DOWNLOAD_DIR=downloads/
+       - CONFIDENCE_THRESHOLD=0.7
+       - PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox --disable-setuid-sandbox
+       - CRAWLEE_CHROMIUM_SANDBOX=false
+       - CHROMIUM_SANDBOX=false
+
     restart: unless-stopped
+
