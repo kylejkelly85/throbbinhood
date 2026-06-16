@@ -1,4 +1,4 @@
-python-fasthtml==0.5.2
+fasthtml>=0.6.0
 crawlee[playwright]>=0.4.2
 sqlalchemy[asyncio]>=2.0.30
 aiosqlite>=0.20.0

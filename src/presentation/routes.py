@@ -3,6 +3,7 @@ from src.container import container
 from src.presentation.components import Layout, AssetTable
 from src.infrastructure.logger import logger
 from typing import Any
+from starlette.responses import HTMLResponse  # <-- ADD THIS LINE
 
 def setup_routes(app: Any, rt: Any) -> None:
 
@@ -10,7 +11,7 @@ def setup_routes(app: Any, rt: Any) -> None:
     async def get(page: int = 1) -> Any:
         assets = await container.asset_service.get_assets(page)
         total = await container.asset_service.get_total_count()
-        return Layout("Targeted Harvester", 
+        content = Layout("Targeted Harvester",   # <-- Store in variable
             Div(
                 Form(
                     Div(
@@ -58,6 +59,9 @@ def setup_routes(app: Any, rt: Any) -> None:
                 hx_get=f"/?page={page}", hx_trigger="every 10s", hx_select="#asset-table", hx_swap="outerHTML"
             )
         )
+        return HTMLResponse(str(content))  # <-- RETURN THIS INSTEAD
+
+    # ... rest of file stays EXACTLY the same ...
 
     @rt("/start", methods=["POST"])
     async def post_start(urls: str = "", target_keyword: str = "", file_extension: str = "pdf") -> Any:
