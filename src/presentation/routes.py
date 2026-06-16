@@ -86,7 +86,7 @@ def setup_routes(app: Any, rt: Any) -> None:
             seed_urls=normalized_urls, 
             target_keyword=target_keyword.strip(), 
             file_extension=file_extension,
-            max_requests=10
+            max_requests=100
         )
         logger.info("started_crawl", job_id=job_id)
         return HTMLResponse(str(Div(f"Started targeted harvesting job {job_id}", cls="text-green-600 font-bold")))

@@ -6,10 +6,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - ./app.py:/app/app.py
+      - ./src:/app/src
       - ./data:/app/data
       - ./downloads:/app/downloads
       - ./logs:/app/logs
     environment:
+       - PYTHONUNBUFFERED=1   # ensures print() flushes immediately
        - DATABASE_URL=sqlite+aiosqlite:///data/pipeline.db
        - LOG_LEVEL=INFO
        - DOWNLOAD_DIR=downloads/
