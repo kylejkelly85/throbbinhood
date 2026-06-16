@@ -1,5 +1,4 @@
-from crawlee.playwright_crawler import PlaywrightCrawler
-from crawlee.http_crawler import HttpCrawler
+from crawlee.crawlers import PlaywrightCrawler, HttpCrawler
 
 class CrawlerFactory:
     @staticmethod
