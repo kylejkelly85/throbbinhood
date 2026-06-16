@@ -26,7 +26,13 @@ def AssetTable(assets: list[Asset], page: int) -> Div:
     for asset in assets:
         if not asset.is_downloaded:
             action_td = Td(
-                Button("Download", hx_post=f"/download/{asset.id}", hx_target="closest tr", hx_swap="outerHTML", cls="bg-green-500 text-white px-2 py-1 rounded"),
+                Button(
+                    "Download",
+                    hx_post=f"/download/{asset.id}",
+                    hx_target="closest tr",
+                    hx_swap="outerHTML",
+                    cls="bg-green-500 text-white px-2 py-1 rounded"
+                ),
                 cls="p-2 border"
             )
         else:
@@ -38,18 +44,25 @@ def AssetTable(assets: list[Asset], page: int) -> Div:
             Td(f"{asset.confidence_score:.2f}", cls="p-2 border"),
             action_td
         ))
-    
+
+    pagination = []
+    if page > 1:
+        pagination.append(A("Previous", href=f"/?page={page-1}", cls="text-blue-500 mr-4"))
+    if len(assets) == 50:
+        pagination.append(A("Next", href=f"/?page={page+1}", cls="text-blue-500"))
+
     return Div(
         Table(
-            Thead(Tr(Th("Title", cls="p-2 border"), Th("URL", cls="p-2 border"), Th("Score", cls="p-2 border"), Th("Status/Action", cls="p-2 border"))),
+            Thead(Tr(
+                Th("Title", cls="p-2 border"),
+                Th("URL", cls="p-2 border"),
+                Th("Score", cls="p-2 border"),
+                Th("Status/Action", cls="p-2 border")
+            )),
             Tbody(*rows),
             cls="w-full text-sm text-left rtl:text-right text-gray-500"
         ),
-        Div(
-            A("Previous", href=f"/?page={page-1}", cls="text-blue-500 mr-4") if page > 1 else "",
-            A("Next", href=f"/?page={page+1}", cls="text-blue-500") if len(assets) == 50 else "",
-            cls="mt-4"
-        ),
+        Div(*pagination, cls="mt-4") if pagination else "",
         id="asset-table",
         cls="relative overflow-x-auto"
     )
