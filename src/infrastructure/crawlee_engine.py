@@ -4,6 +4,7 @@ from src.infrastructure.logger import logger
 from crawlee.crawlers import PlaywrightCrawlingContext
 from typing import Callable, Awaitable, List
 import os
+from urllib.parse import urlparse
 
 class CrawleeEngine:
     def __init__(
@@ -29,15 +30,19 @@ class CrawleeEngine:
             }
         }
 
+        # Extract base domains from seed URLs to keep the crawl on-site
+        allowed_domains = {urlparse(url).netloc for url in seed_urls}
+
         @crawler.router.default_handler
         async def request_handler(context: PlaywrightCrawlingContext) -> None:
             url = context.request.url
             url_lower = url.lower()
+            ext_lower = file_extension.lower()
 
             logger.info("handler_called", url=url)
 
-            # If this is a file URL, process it
-            if file_extension and url_lower.endswith(f".{file_extension.lower()}"):
+            # --- CASE 1: IT'S A TARGET FILE ---
+            if file_extension and url_lower.endswith(f".{ext_lower}"):
                 logger.info("processing_file", url=url)
 
                 has_keyword = False
@@ -75,19 +80,37 @@ class CrawleeEngine:
                 else:
                     logger.info("asset_failed_gate", url=url, score=score)
 
+            # --- CASE 2: IT'S AN HTML PAGE ---
             else:
-                # This is an HTML page — enqueue all matching links from it
                 logger.info("enqueuing_links_from_page", url=url)
         
-                links = await context.page.evaluate('''(ext) => {
-                    return Array.from(document.querySelectorAll("a[href]"))
-                        .map(a => a.href)
-                        .filter(href => href.toLowerCase().endsWith("." + ext));
-                }''', file_extension.lower())
+                # Extract ALL links from the page
+                all_links = await context.page.evaluate('''() => {
+                    return Array.from(document.querySelectorAll("a[href]")).map(a => a.href);
+                }''')
 
-                logger.info("links_found", url=url, count=len(links), extension=file_extension)
+                file_links = []
+                html_links = []
 
-                for link in links:
+                for link in all_links:
+                    link_lower = link.lower()
+                    parsed_link = urlparse(link)
+                    
+                    # Ensure we stay within the seed domain scope
+                    if parsed_link.netloc not in allowed_domains:
+                        continue
+
+                    # Classify the link
+                    if file_extension and link_lower.endswith(f".{ext_lower}"):
+                        file_links.append(link)
+                    # Simple heuristic: ignore common media/assets, accept web pages
+                    elif not any(link_lower.endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.zip', '.css', '.js']):
+                        html_links.append(link)
+
+                logger.info("links_classified", url=url, files_found=len(file_links), html_pages_found=len(html_links))
+
+                # Enqueue everything found to the request queue
+                for link in (file_links + html_links):
                     await context.add_requests([link])
 
         await crawler.run(seed_urls)
