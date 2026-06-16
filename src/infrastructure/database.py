@@ -29,5 +29,18 @@ class AssetModel(Base):
     local_path: Mapped[str] = mapped_column(String, nullable=True)
 
 async def init_db() -> None:
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        migrations = [
+            "ALTER TABLE assets ADD COLUMN status VARCHAR DEFAULT 'Pending'",
+            "ALTER TABLE assets ADD COLUMN local_path VARCHAR",
+            "ALTER TABLE crawl_jobs ADD COLUMN target_keyword VARCHAR DEFAULT ''",
+            "ALTER TABLE crawl_jobs ADD COLUMN file_extension VARCHAR"
+        ]
+        for query in migrations:
+            try:
+                await conn.execute(text(query))
+            except Exception:
+                pass

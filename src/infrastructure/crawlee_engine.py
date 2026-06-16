@@ -46,6 +46,7 @@ class CrawleeEngine:
             has_keyword = False
             title = ""
             content_snippet = ""
+            text = ""
             
             import aiohttp
             try:
